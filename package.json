@@ -1,0 +1,29 @@
+{
+  "name": "the-infinity",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Infinity bottle tracker — log pours, track ABV drift, predict the blend.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "better-sqlite3": "^13.0.3",
+    "drizzle-kit": "^0.31.11",
+    "drizzle-orm": "^0.45.3",
+    "nativewind": "^4.2.7",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "expo": "^57.0.27",
+    "expo-router": "^57.0.25",
+    "expo-sqlite": "^57.0.4",
+    "react": "^19.2.3",
+    "react-native": "^0.87.1",
+    "react-native-web": "^0.19.13",
+    "zod": "^4.6.5"
+  }
+}

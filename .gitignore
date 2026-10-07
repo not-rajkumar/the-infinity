@@ -1,0 +1,13 @@
+node_modules/
+npm-debug.log*
+*.log
+.expo/
+.expo-shared/
+build/
+dist/
+
+# Session / docs — not package code
+SESSION_CHANGES.md
+CLAUDE.md
+PHASE_2_COMPLETE.md
+memory/
