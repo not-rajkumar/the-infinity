@@ -9,15 +9,24 @@ Install dependencies with `npm install`.
 - Run tests in watch mode: `npm run test:watch`
 - Run one test file: `npx vitest run src/domain/__tests__/abv.test.ts`
 - Run one test by name: `npx vitest run src/domain/__tests__/fold.test.ts -t "clamps"`
+- Generate a Drizzle migration after changing `src/db/schema.ts`: `npm run db:generate`
 - Start the Expo development server: `npx expo start`
 
 The package does not currently define a separate lint or production build script.
+
+## Current status and next task
+
+The domain math, SQLite/Drizzle schema, initial migration, catalog/barcode parsing, cache, Zustand scaffolding, and Expo tab scaffold are present. The initial migration is bundled in `src/db/migrations/index.ts` and runs from `app/_layout.tsx` before the router renders. Strict typecheck and all 49 domain tests pass.
+
+The next implementation task is persistence integration: connect the in-memory Zustand blend/event stores to Drizzle, implement append-only blend/bottle/event CRUD, load the active blend and event log on startup, and wire the Blend, Log, and Catalog tabs to the stores. Preserve `fold()` as the source of truth; database projections remain cache data. After changing `src/db/schema.ts`, run `npm run db:generate` and update the bundled migration export in `src/db/migrations/index.ts`.
 
 ## Architecture
 
 This is an Expo/React Native app using Expo Router, with Android as the primary target and iOS as a secondary target. The root router is `app/_layout.tsx`; the tab screens and tab layout live under `src/app/(tabs)`.
 
 The app is local-first and offline-capable. Drizzle wraps the `expo-sqlite` database in `src/db/index.ts`, with tables defined in `src/db/schema.ts`. The data model is `blends -> bottles -> blend_events`; `predictions`, `tastings`, `catalog_cache`, and `meta` are read-side/supporting tables. The SQLite database is the source of persistence, but the event log is the source of truth for a blend's current contents.
+
+Database migrations are generated from `src/db/schema.ts` using `drizzle.config.ts` and `npm run db:generate`. Expo consumes the generated SQL through the typed migration bundle in `src/db/migrations/index.ts`; the root layout runs `useMigrations` before displaying the navigation stack. Do not create or open a second database singleton, and do not render screens that query the database before migration succeeds.
 
 The domain layer in `src/domain` contains the blend math and event folding. It must stay independent of React Native, Expo, SQLite/Drizzle, network clients, and UI state so it remains deterministic and fast to test. `fold()` orders events, derives the current state and per-event projections, and reports malformed data as `FoldProblem`s instead of throwing. `src/hooks`, `src/store`, and UI components consume those domain functions; Zustand stores currently keep the active blend/events and derived fold result in memory.
 

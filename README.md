@@ -15,7 +15,12 @@ Expo + React Native app for tracking whiskey in an infinity bottle: event-source
 npm install
 npm run typecheck   # strict TypeScript
 npm test             # 49 domain tests, 100% pass required
+npm run db:generate  # generate migrations after changing src/db/schema.ts
 ```
+
+The Expo root layout applies bundled Drizzle migrations before rendering the
+navigation stack. The SQLite database is `the-infinity.db`; the event log is
+the source of truth and derived projections are cache data.
 
 ## Stack
 - Expo + TypeScript + Expo Router
@@ -34,3 +39,4 @@ npm test             # 49 domain tests, 100% pass required
 
 ## Repo
 `https://github.com/not-rajkumar/the-infinity`
+V2 dependency fixes — React/Tailwind conflicts — see SESSION_CHANGES.md § V2 Dependency Problems. Phase 3 scaffold pushed (3957941, clean, no attribution). Domain: 49/49 pass.

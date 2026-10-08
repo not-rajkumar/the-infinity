@@ -6,7 +6,8 @@ import type { BlendEvent } from '../domain/types';
 
 interface PourEntryProps {
   blendId: string;
-  onAddEvent: (event: BlendEvent) => void;
+  currentAbvBp: number | null;
+  onAddEvent: (event: BlendEvent) => Promise<void>;
 }
 
 export function PourEntry({ blendId, onAddEvent }: PourEntryProps) {
@@ -15,7 +16,7 @@ export function PourEntry({ blendId, onAddEvent }: PourEntryProps) {
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleAdd = (kind: 'ADD' | 'REMOVE') => {
+  const handleAdd = async (kind: 'ADD' | 'REMOVE') => {
     setError(null);
     const volumeMl = parseVolumeMl(volumeInput);
     if (volumeMl === null || volumeMl <= 0) {
@@ -23,7 +24,7 @@ export function PourEntry({ blendId, onAddEvent }: PourEntryProps) {
       return;
     }
 
-    let abvBp: number | null = null;
+    let abvBp: number | null = kind === 'REMOVE' ? currentAbvBp : null;
     if (kind === 'ADD') {
       abvBp = parseAbvBp(abvInput);
       if (abvBp === null) {
@@ -46,8 +47,12 @@ export function PourEntry({ blendId, onAddEvent }: PourEntryProps) {
       isApproximate: false,
     };
 
-    onAddEvent(event);
-    setNote('');
+    try {
+      await onAddEvent(event);
+      setNote('');
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : 'Could not save event');
+    }
   };
 
   return (

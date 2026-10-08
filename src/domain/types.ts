@@ -23,6 +23,7 @@ export type BottleSource = 'manual' | 'catalog' | 'barcode';
 /** A source bottle — something that can be poured into the blend. */
 export interface Bottle {
   id: string;
+  blendId: string;
   name: string;
   distillery: string | null;
   /** e.g. 'Single Malt', 'Bourbon', 'Rye', 'Blended Scotch' */
