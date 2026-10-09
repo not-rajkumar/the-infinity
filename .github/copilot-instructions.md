@@ -16,9 +16,9 @@ The package does not currently define a separate lint or production build script
 
 ## Current status and next task
 
-The domain math, SQLite/Drizzle schema, initial migration, catalog/barcode parsing, cache, Zustand scaffolding, and Expo tab scaffold are present. The initial migration is bundled in `src/db/migrations/index.ts` and runs from `app/_layout.tsx` before the router renders. Strict typecheck and all 49 domain tests pass.
+The domain math, SQLite/Drizzle schema, migrations, catalog/barcode parsing, cache, Zustand stores, and Expo tab UI are present. Blend, event, and bottle persistence hydrate from SQLite before the router renders. Bottle CRUD is available from the Catalog tab; additions can select a catalog bottle, inherit its ABV, link `sourceBottleId`, and decrement tracked remaining volume. Strict typecheck and all 49 domain tests pass.
 
-The next implementation task is persistence integration: connect the in-memory Zustand blend/event stores to Drizzle, implement append-only blend/bottle/event CRUD, load the active blend and event log on startup, and wire the Blend, Log, and Catalog tabs to the stores. Preserve `fold()` as the source of truth; database projections remain cache data. After changing `src/db/schema.ts`, run `npm run db:generate` and update the bundled migration export in `src/db/migrations/index.ts`.
+The next implementation task is real catalog lookup and barcode scanning. Replace the stubs in `src/catalog/lookup.ts` with a provider-backed lookup that uses `CatalogCache`, add camera scanning through the existing barcode boundary, and let users create a bottle from scanned/lookup results without weakening manual entry. After that, add the ABV drift chart and polish the catalog, blend, and log screens. Preserve `fold()` as the source of truth; database projections remain cache data. After changing `src/db/schema.ts`, run `npm run db:generate` and update the bundled migration export in `src/db/migrations/index.ts`.
 
 ## Architecture
 
@@ -30,7 +30,7 @@ Database migrations are generated from `src/db/schema.ts` using `drizzle.config.
 
 The domain layer in `src/domain` contains the blend math and event folding. It must stay independent of React Native, Expo, SQLite/Drizzle, network clients, and UI state so it remains deterministic and fast to test. `fold()` orders events, derives the current state and per-event projections, and reports malformed data as `FoldProblem`s instead of throwing. `src/hooks`, `src/store`, and UI components consume those domain functions; Zustand stores currently keep the active blend/events and derived fold result in memory.
 
-Catalog functionality is split between input parsing (`src/catalog/parse.ts`), the SQLite-backed TTL/size-bounded cache (`src/catalog/cache.ts`), and external lookup stubs (`src/catalog/lookup.ts`). Barcode normalization is in `src/barcode/scan.ts`. The catalog lookup layer is intentionally replaceable as external providers are added.
+Catalog functionality is split between input parsing (`src/catalog/parse.ts`), the SQLite-backed TTL/size-bounded cache (`src/catalog/cache.ts`), and external lookup stubs (`src/catalog/lookup.ts`). Barcode normalization is in `src/barcode/scan.ts`; the camera scanner should feed that boundary rather than bypassing validation. Bottle additions may reference `sourceBottleId`, and `remainingVolumeMl` is a denormalized inventory projection, not event-log truth. The catalog lookup layer is intentionally replaceable as external providers are added.
 
 ## Key conventions
 
