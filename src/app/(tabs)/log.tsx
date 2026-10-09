@@ -1,9 +1,11 @@
 import { ScrollView, Text, View } from 'react-native';
 import { useEventStore } from '../../store/useEventStore';
+import { useBottleStore } from '../../store/useBottleStore';
 import { formatAbv, formatVolume } from '../../domain/units';
 
 export default function LogScreen() {
   const events = useEventStore((store) => store.events);
+  const bottles = useBottleStore((store) => store.bottles);
   return (
     <ScrollView className="flex-1 bg-stone-950" contentContainerClassName="p-5">
       <Text className="text-stone-100 text-3xl font-bold mb-1">Timeline</Text>
@@ -20,6 +22,11 @@ export default function LogScreen() {
               <Text className="text-stone-200 font-bold">{formatVolume(event.volumeMl)}</Text>
             </View>
             {event.abvBp !== null && <Text className="text-stone-400 mt-2">{formatAbv(event.abvBp)} projection</Text>}
+            {event.sourceBottleId && (
+              <Text className="text-amber-300 mt-1">
+                Source: {bottles.find((bottle) => bottle.id === event.sourceBottleId)?.name ?? 'Deleted bottle'}
+              </Text>
+            )}
             {event.note && <Text className="text-stone-300 mt-1">{event.note}</Text>}
             <Text className="text-stone-600 text-xs mt-3">{new Date(event.occurredAt).toLocaleString()}</Text>
           </View>

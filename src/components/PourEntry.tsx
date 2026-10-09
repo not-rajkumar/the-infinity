@@ -2,19 +2,22 @@ import React, { useState } from 'react';
 import { Text, View, TextInput, TouchableOpacity } from 'react-native';
 import { POUR_PRESETS_ML, parseVolumeMl, parseAbvBp } from '../domain/units';
 import { generateId } from '../lib/id';
-import type { BlendEvent } from '../domain/types';
+import type { BlendEvent, Bottle } from '../domain/types';
 
 interface PourEntryProps {
   blendId: string;
   currentAbvBp: number | null;
+  bottles: Bottle[];
   onAddEvent: (event: BlendEvent) => Promise<void>;
+  onConsumeBottle: (id: string, volumeMl: number) => Promise<void>;
 }
 
-export function PourEntry({ blendId, onAddEvent }: PourEntryProps) {
+export function PourEntry({ blendId, bottles, onAddEvent, onConsumeBottle }: PourEntryProps) {
   const [volumeInput, setVolumeInput] = useState('50');
   const [abvInput, setAbvInput] = useState('46');
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [selectedBottleId, setSelectedBottleId] = useState<string | null>(null);
 
   const handleAdd = async (kind: 'ADD' | 'REMOVE') => {
     setError(null);
@@ -24,11 +27,20 @@ export function PourEntry({ blendId, onAddEvent }: PourEntryProps) {
       return;
     }
 
+    const selectedBottle = bottles.find((bottle) => bottle.id === selectedBottleId);
     let abvBp: number | null = kind === 'REMOVE' ? currentAbvBp : null;
     if (kind === 'ADD') {
-      abvBp = parseAbvBp(abvInput);
+      abvBp = selectedBottle?.abvBp ?? parseAbvBp(abvInput);
       if (abvBp === null) {
         setError('Invalid ABV');
+        return;
+      }
+      if (
+        selectedBottle?.remainingVolumeMl !== null &&
+        selectedBottle?.remainingVolumeMl !== undefined &&
+        volumeMl > selectedBottle.remainingVolumeMl
+      ) {
+        setError(`Only ${selectedBottle.remainingVolumeMl}ml remains in this bottle.`);
         return;
       }
     }
@@ -40,7 +52,7 @@ export function PourEntry({ blendId, onAddEvent }: PourEntryProps) {
       kind,
       volumeMl,
       abvBp,
-      sourceBottleId: null,
+      sourceBottleId: kind === 'ADD' ? selectedBottleId : null,
       note: note.trim() || null,
       occurredAt: now,
       createdAt: now,
@@ -49,6 +61,9 @@ export function PourEntry({ blendId, onAddEvent }: PourEntryProps) {
 
     try {
       await onAddEvent(event);
+      if (kind === 'ADD' && selectedBottleId) {
+        await onConsumeBottle(selectedBottleId, volumeMl);
+      }
       setNote('');
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : 'Could not save event');
@@ -60,6 +75,29 @@ export function PourEntry({ blendId, onAddEvent }: PourEntryProps) {
       <Text className="text-stone-200 text-lg font-bold mb-4">Log Pour / Addition</Text>
 
       {error && <Text className="text-red-400 mb-3 text-sm">{error}</Text>}
+
+      <View className="mb-4">
+        <Text className="text-stone-400 text-xs uppercase mb-1">Source bottle (optional)</Text>
+        <View className="flex-row flex-wrap gap-2">
+          <TouchableOpacity
+            onPress={() => setSelectedBottleId(null)}
+            className={`px-3 py-2 rounded-lg border ${selectedBottleId === null ? 'bg-amber-800 border-amber-600' : 'bg-stone-800 border-stone-700'}`}
+          >
+            <Text className="text-stone-200">Manual</Text>
+          </TouchableOpacity>
+          {bottles.map((bottle) => (
+            <TouchableOpacity
+              key={bottle.id}
+              onPress={() => setSelectedBottleId(bottle.id)}
+              className={`px-3 py-2 rounded-lg border ${selectedBottleId === bottle.id ? 'bg-amber-800 border-amber-600' : 'bg-stone-800 border-stone-700'}`}
+            >
+              <Text className="text-stone-200">
+                {bottle.name}{bottle.remainingVolumeMl === null ? '' : ` (${bottle.remainingVolumeMl}ml)`}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
 
       <View className="mb-4">
         <Text className="text-stone-400 text-xs uppercase mb-1">Volume (ml or oz)</Text>

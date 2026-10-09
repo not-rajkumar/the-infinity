@@ -23,6 +23,7 @@ export const bottles = sqliteTable('bottles', {
   country: text('country'),
   abvBp: integer('abv_bp'),
   volumeMl: integer('volume_ml'),
+  remainingVolumeMl: integer('remaining_volume_ml'),
   barcode: text('barcode'),
   photoUri: text('photo_uri'),
   notes: text('notes'),

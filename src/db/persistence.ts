@@ -40,6 +40,7 @@ function toBottle(row: typeof bottles.$inferSelect): Bottle {
     country: row.country,
     abvBp: row.abvBp,
     volumeMl: row.volumeMl,
+    remainingVolumeMl: row.remainingVolumeMl,
     barcode: row.barcode,
     photoUri: row.photoUri,
     notes: row.notes,
@@ -94,6 +95,14 @@ export async function updateBottle(bottle: Bottle): Promise<void> {
 
 export async function deleteBottle(id: string): Promise<void> {
   await db.delete(bottles).where(eq(bottles.id, id)).run();
+}
+
+export async function consumeBottleVolume(id: string, volumeMl: number): Promise<Bottle | null> {
+  const row = await db.select().from(bottles).where(eq(bottles.id, id)).get();
+  if (!row || row.remainingVolumeMl === null) return row ? toBottle(row) : null;
+  const remainingVolumeMl = Math.max(0, row.remainingVolumeMl - volumeMl);
+  await db.update(bottles).set({ remainingVolumeMl }).where(eq(bottles.id, id)).run();
+  return toBottle({ ...row, remainingVolumeMl });
 }
 
 export async function loadBlendEvents(blendId: string): Promise<BlendEvent[]> {

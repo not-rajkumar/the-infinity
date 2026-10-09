@@ -33,6 +33,8 @@ export interface Bottle {
   abvBp: number | null;
   /** Nominal bottle size, not remaining volume. */
   volumeMl: number | null;
+  /** Remaining volume available to pour, when tracked. */
+  remainingVolumeMl: number | null;
   barcode: string | null;
   photoUri: string | null;
   notes: string | null;

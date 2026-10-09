@@ -36,6 +36,7 @@ export const useBlendStore = create<BlendStore>((set) => ({
     set({
       activeBlend,
       activeBlendId: activeBlend?.id ?? null,
+      state: emptyState(),
       hydrated: true,
     });
   },

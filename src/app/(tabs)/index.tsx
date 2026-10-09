@@ -2,6 +2,7 @@ import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-nativ
 import { useState } from 'react';
 import { useBlendStore } from '../../store/useBlendStore';
 import { useEventStore } from '../../store/useEventStore';
+import { useBottleStore } from '../../store/useBottleStore';
 import { formatAbv } from '../../domain/units';
 import { abvBp } from '../../domain/abv';
 import { PourEntry } from '../../components/PourEntry';
@@ -13,6 +14,8 @@ export default function BlendScreen() {
   const createActiveBlend = useBlendStore((store) => store.createActiveBlend);
   const { state } = useEventStore((store) => store.foldResult);
   const addEvent = useEventStore((store) => store.addEvent);
+  const bottles = useBottleStore((store) => store.bottles).filter((bottle) => bottle.blendId === blend?.id);
+  const consumeBottleVolume = useBottleStore((store) => store.consumeVolume);
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const abv = state.volumeMl > 0 ? formatAbv(Math.round(state.units / state.volumeMl)) : '—';
@@ -73,7 +76,13 @@ export default function BlendScreen() {
         <Text className="text-amber-100 text-5xl font-bold mt-2">{state.volumeMl} ml</Text>
         <Text className="text-amber-300 text-lg mt-1">{abv} ABV</Text>
       </View>
-      <PourEntry blendId={blend.id} currentAbvBp={abvBp(state)} onAddEvent={handleEvent} />
+      <PourEntry
+        blendId={blend.id}
+        currentAbvBp={abvBp(state)}
+        bottles={bottles}
+        onAddEvent={handleEvent}
+        onConsumeBottle={consumeBottleVolume}
+      />
     </ScrollView>
   );
 }

@@ -74,10 +74,18 @@ const migrations = {
         tag: '0000_lying_whirlwind',
         breakpoints: true,
       },
+      {
+        idx: 1,
+        version: '7',
+        when: 1791566670000,
+        tag: '0001_add_remaining_volume',
+        breakpoints: true,
+      },
     ],
   },
   migrations: {
     m0000: initialMigration,
+    m0001: `ALTER TABLE "bottles" ADD COLUMN "remaining_volume_ml" integer;`,
   },
 };
 
