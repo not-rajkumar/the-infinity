@@ -36,9 +36,14 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install --non-interactive
 
-      - name: Allow Expo Gradle compatibility
+      - name: Patch Expo Kotlin compatibility
+        run: |
+          find node_modules/expo-modules-autolinking/android/expo-gradle-plugin -name build.gradle.kts -print0 |
+            xargs -0 sed -i '/jvmTarget.set(JvmTarget.JVM_11)/a\    freeCompilerArgs.add("-Xskip-metadata-version-check")'
+
+      - name: Update Gradle wrapper
         working-directory: android
-        run: echo "android.overrideVersionCheck=true" >> gradle.properties
+        run: sed -i 's/gradle-9\.3\.1-bin\.zip/gradle-9.4.1-bin.zip/' gradle/wrapper/gradle-wrapper.properties
 
       - name: Assemble release APK
         working-directory: android
