@@ -36,9 +36,9 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install --non-interactive
 
-      - name: Update Gradle wrapper
+      - name: Allow Expo Gradle compatibility
         working-directory: android
-        run: sed -i 's/gradle-9\.3\.1-bin\.zip/gradle-9.4.1-bin.zip/' gradle/wrapper/gradle-wrapper.properties
+        run: echo "android.overrideVersionCheck=true" >> gradle.properties
 
       - name: Assemble release APK
         working-directory: android
