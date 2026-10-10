@@ -8,11 +8,14 @@ import { abvBp } from '../../domain/abv';
 import { PourEntry } from '../../components/PourEntry';
 import { generateId } from '../../lib/id';
 import type { BlendEvent } from '../../domain/types';
+import { AbvDriftChart } from '../../components/AbvDriftChart';
 
 export default function BlendScreen() {
   const blend = useBlendStore((store) => store.activeBlend);
   const createActiveBlend = useBlendStore((store) => store.createActiveBlend);
-  const { state } = useEventStore((store) => store.foldResult);
+  const { state, problems } = useEventStore((store) => store.foldResult);
+  const events = useEventStore((store) => store.events);
+  const projections = useEventStore((store) => store.foldResult.projections);
   const addEvent = useEventStore((store) => store.addEvent);
   const bottles = useBottleStore((store) => store.bottles).filter((bottle) => bottle.blendId === blend?.id);
   const consumeBottleVolume = useBottleStore((store) => store.consumeVolume);
@@ -27,15 +30,19 @@ export default function BlendScreen() {
       return;
     }
     const now = new Date().toISOString();
-    await createActiveBlend({
-      id: generateId(),
-      name: trimmedName,
-      vesselCapacityMl: null,
-      startedAt: now,
-      notes: null,
-      archivedAt: null,
-    });
-    setError(null);
+    try {
+      await createActiveBlend({
+        id: generateId(),
+        name: trimmedName,
+        vesselCapacityMl: null,
+        startedAt: now,
+        notes: null,
+        archivedAt: null,
+      });
+      setError(null);
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : 'Could not create blend.');
+    }
   };
 
   const handleEvent = async (event: BlendEvent) => {
@@ -76,9 +83,20 @@ export default function BlendScreen() {
         <Text className="text-amber-100 text-5xl font-bold mt-2">{state.volumeMl} ml</Text>
         <Text className="text-amber-300 text-lg mt-1">{abv} ABV</Text>
       </View>
+      {problems.length > 0 && (
+        <View className="bg-amber-950 border border-amber-800 p-4 rounded-2xl mb-5">
+          <Text className="text-amber-200 font-bold mb-1">History needs attention</Text>
+          <Text className="text-amber-300 text-sm">
+            {problems.length} event {problems.length === 1 ? 'was' : 'were'} safely flagged while calculating the blend.
+          </Text>
+        </View>
+      )}
+      <AbvDriftChart events={events} projections={projections} />
       <PourEntry
         blendId={blend.id}
         currentAbvBp={abvBp(state)}
+        capacityMl={blend.vesselCapacityMl}
+        currentVolumeMl={state.volumeMl}
         bottles={bottles}
         onAddEvent={handleEvent}
         onConsumeBottle={consumeBottleVolume}

@@ -7,6 +7,7 @@
  * Returns normalized barcode or null when input is garbage.
  */
 import { parseBarcode } from '../catalog/parse';
+export { parseBarcode } from '../catalog/parse';
 
 export interface ScanResult {
   barcode: string;

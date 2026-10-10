@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useBlendStore } from '../../store/useBlendStore';
 import { useBottleStore } from '../../store/useBottleStore';
 import { parseAbvBp, parseVolumeMl } from '../../domain/units';
-import { parseBarcode } from '../../barcode/scan';
+import { parseBarcode, parseScanResult } from '../../barcode/scan';
 import { generateId } from '../../lib/id';
 import type { Bottle } from '../../domain/types';
+import type { CatalogEntry } from '../../catalog/cache';
+import { lookupBarcode, searchByName } from '../../catalog/lookup';
 
 interface BottleForm {
   name: string;
@@ -42,6 +45,20 @@ function formFromBottle(bottle: Bottle): BottleForm {
     volume: bottle.volumeMl === null ? '' : String(bottle.volumeMl),
     barcode: bottle.barcode ?? '',
     notes: bottle.notes ?? '',
+  };
+}
+
+function formFromCatalogEntry(entry: CatalogEntry): BottleForm {
+  return {
+    name: entry.name,
+    distillery: entry.distillery ?? '',
+    category: entry.category ?? '',
+    region: entry.region ?? '',
+    country: entry.country ?? '',
+    abv: entry.abvBp === null ? '' : String(entry.abvBp / 100),
+    volume: entry.volumeMl === null ? '' : String(entry.volumeMl),
+    barcode: entry.barcode,
+    notes: '',
   };
 }
 
@@ -82,6 +99,13 @@ export default function CatalogScreen() {
   const [form, setForm] = useState<BottleForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lookupInput, setLookupInput] = useState('');
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [prefillSource, setPrefillSource] = useState<'manual' | 'catalog' | 'barcode'>('manual');
+  const [prefillPhotoUri, setPrefillPhotoUri] = useState<string | null>(null);
+  const scanHandled = useRef(false);
 
   const activeBottles = activeBlend
     ? bottles.filter((bottle) => bottle.blendId === activeBlend.id)
@@ -91,7 +115,107 @@ export default function CatalogScreen() {
   const resetForm = () => {
     setForm(emptyForm);
     setEditingId(null);
+    setPrefillSource('manual');
+    setPrefillPhotoUri(null);
     setError(null);
+  };
+
+  const applyLookupResult = (entry: CatalogEntry, source: 'catalog' | 'barcode' = 'catalog') => {
+    setForm(formFromCatalogEntry(entry));
+    setEditingId(null);
+    setPrefillSource(source);
+    setPrefillPhotoUri(entry.photoUrl);
+    setError(null);
+    setCameraOpen(false);
+  };
+
+  const lookup = async () => {
+    const barcode = parseBarcode(lookupInput);
+    if (!barcode) {
+      setError('Enter a valid 8–13 digit barcode.');
+      return;
+    }
+    setLookupBusy(true);
+    setError(null);
+    try {
+      const entry = await lookupBarcode(barcode);
+      if (!entry) setError('No catalog result. You can still enter the bottle manually.');
+      else applyLookupResult(entry, 'catalog');
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : 'Catalog lookup failed. Try again or enter it manually.');
+    } finally {
+      setLookupBusy(false);
+    }
+  };
+
+  const search = async () => {
+    if (!lookupInput.trim()) {
+      setError('Enter a bottle name to search.');
+      return;
+    }
+    setLookupBusy(true);
+    setError(null);
+    try {
+      const results = await searchByName(lookupInput);
+      if (results.length === 0) {
+        setError('No catalog result. You can still enter the bottle manually.');
+      } else if (results.length === 1) {
+        applyLookupResult(results[0]!, 'catalog');
+      } else {
+        Alert.alert('Choose a bottle', undefined, results.slice(0, 5).map((entry) => ({
+          text: entry.name,
+          onPress: () => applyLookupResult(entry, 'catalog'),
+        })).concat([{ text: 'Cancel', style: 'cancel' as const }]));
+      }
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : 'Catalog search failed. Try again or enter it manually.');
+    } finally {
+      setLookupBusy(false);
+    }
+  };
+
+  const openCamera = async () => {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        setError('Camera permission is required to scan a barcode.');
+        return;
+      }
+    }
+    scanHandled.current = false;
+    setCameraOpen(true);
+  };
+
+  const handleScan = async (raw: string) => {
+    const scan = parseScanResult(raw);
+    if (scanHandled.current) return;
+    if (!scan) {
+      setError('That scan was not a supported barcode.');
+      return;
+    }
+    scanHandled.current = true;
+    const result = scan.barcode;
+    setCameraOpen(false);
+    setLookupInput(result);
+    setLookupBusy(true);
+    setError(null);
+    try {
+      const entry = await lookupBarcode(result);
+      if (entry) applyLookupResult(entry, 'barcode');
+      else {
+        setForm((current) => ({ ...current, barcode: result }));
+        setPrefillSource('barcode');
+        setPrefillPhotoUri(null);
+        setError('Barcode saved. No catalog result; complete the bottle manually.');
+      }
+    } catch (cause: unknown) {
+      setForm((current) => ({ ...current, barcode: result }));
+      setPrefillSource('barcode');
+      setPrefillPhotoUri(null);
+      setError(cause instanceof Error ? cause.message : 'Lookup failed; complete the bottle manually.');
+    } finally {
+      setLookupBusy(false);
+    }
   };
 
   const saveBottle = async () => {
@@ -120,6 +244,11 @@ export default function CatalogScreen() {
       setError('Enter an 8–13 digit barcode.');
       return;
     }
+    const duplicate = barcode && bottles.some((bottle) => bottle.barcode === barcode && bottle.id !== editingId);
+    if (duplicate) {
+      setError('A bottle with this barcode is already in the active catalog.');
+      return;
+    }
 
     const current = editingId ? bottles.find((bottle) => bottle.id === editingId) : null;
     const bottle: Bottle = {
@@ -134,9 +263,9 @@ export default function CatalogScreen() {
       volumeMl,
       remainingVolumeMl: current?.remainingVolumeMl ?? volumeMl,
       barcode,
-      photoUri: current?.photoUri ?? null,
+      photoUri: current?.photoUri ?? prefillPhotoUri,
       notes: form.notes.trim() || null,
-      source: current?.source ?? 'manual',
+      source: current?.source ?? prefillSource,
       createdAt: current?.createdAt ?? new Date().toISOString(),
     };
 
@@ -176,6 +305,29 @@ export default function CatalogScreen() {
           <Text className="text-amber-200">Create an active blend on the Blend tab to start a bottle catalog.</Text>
         </View>
       )}
+
+      <View className="bg-stone-900 p-4 rounded-2xl border border-stone-800 mb-5">
+        <Text className="text-stone-100 text-lg font-bold mb-1">Find a bottle</Text>
+        <Text className="text-stone-400 mb-3">Scan a barcode or search the catalog. Results prefill the manual form.</Text>
+        <TextInput
+          className="bg-stone-800 text-stone-100 p-3 rounded-xl border border-stone-700 mb-3"
+          value={lookupInput}
+          onChangeText={setLookupInput}
+          placeholder="Barcode or bottle name"
+          placeholderTextColor="#78716c"
+        />
+        <View className="flex-row gap-2">
+          <TouchableOpacity disabled={lookupBusy} onPress={lookup} className="flex-1 bg-amber-800 p-3 rounded-xl items-center">
+            <Text className="text-amber-100 font-bold">{lookupBusy ? 'Looking up…' : 'Barcode lookup'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity disabled={lookupBusy} onPress={search} className="flex-1 bg-stone-700 p-3 rounded-xl items-center">
+            <Text className="text-stone-200 font-bold">Search name</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={openCamera} className="bg-stone-700 p-3 rounded-xl items-center">
+            <Text className="text-stone-200 font-bold">Scan</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       <View className="bg-stone-900 p-4 rounded-2xl border border-stone-800 mb-5">
         <Text className="text-stone-100 text-lg font-bold mb-4">{editingId ? 'Edit bottle' : 'Add bottle'}</Text>
@@ -219,7 +371,7 @@ export default function CatalogScreen() {
           </Text>
           {bottle.notes && <Text className="text-stone-300 mt-2">{bottle.notes}</Text>}
           <View className="flex-row gap-3 mt-4">
-            <TouchableOpacity onPress={() => { setEditingId(bottle.id); setForm(formFromBottle(bottle)); setError(null); }} className="bg-stone-700 px-4 py-2 rounded-lg">
+            <TouchableOpacity onPress={() => { setEditingId(bottle.id); setForm(formFromBottle(bottle)); setPrefillSource(bottle.source); setError(null); }} className="bg-stone-700 px-4 py-2 rounded-lg">
               <Text className="text-stone-200 font-bold">Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => confirmDelete(bottle)} className="bg-red-950 px-4 py-2 rounded-lg">
@@ -228,6 +380,26 @@ export default function CatalogScreen() {
           </View>
         </View>
       ))}
+      {activeBlend && activeBottles.length === 0 && (
+        <Text className="text-stone-500 text-center py-5">No bottles yet. Add one manually or find it above.</Text>
+      )}
+
+      <Modal visible={cameraOpen} animationType="slide" onRequestClose={() => setCameraOpen(false)}>
+        <View className="flex-1 bg-black">
+          <CameraView
+            className="flex-1"
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'code128', 'code39'] }}
+            onBarcodeScanned={({ data }) => { void handleScan(data); }}
+          />
+          <View className="absolute bottom-0 left-0 right-0 p-6">
+            <Text className="text-white text-center mb-3">Point the camera at a bottle barcode</Text>
+            <TouchableOpacity onPress={() => setCameraOpen(false)} className="bg-stone-800 p-4 rounded-xl items-center">
+              <Text className="text-white font-bold">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }

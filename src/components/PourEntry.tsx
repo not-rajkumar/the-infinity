@@ -7,12 +7,14 @@ import type { BlendEvent, Bottle } from '../domain/types';
 interface PourEntryProps {
   blendId: string;
   currentAbvBp: number | null;
+  capacityMl: number | null;
+  currentVolumeMl: number;
   bottles: Bottle[];
   onAddEvent: (event: BlendEvent) => Promise<void>;
   onConsumeBottle: (id: string, volumeMl: number) => Promise<void>;
 }
 
-export function PourEntry({ blendId, bottles, onAddEvent, onConsumeBottle }: PourEntryProps) {
+export function PourEntry({ blendId, bottles, capacityMl, currentVolumeMl, onAddEvent, onConsumeBottle }: PourEntryProps) {
   const [volumeInput, setVolumeInput] = useState('50');
   const [abvInput, setAbvInput] = useState('46');
   const [note, setNote] = useState('');
@@ -23,7 +25,11 @@ export function PourEntry({ blendId, bottles, onAddEvent, onConsumeBottle }: Pou
     setError(null);
     const volumeMl = parseVolumeMl(volumeInput);
     if (volumeMl === null || volumeMl <= 0) {
-      setError('Invalid volume');
+      setError('Enter a positive volume, such as 50ml or 1.5oz.');
+      return;
+    }
+    if (kind === 'ADD' && capacityMl !== null && currentVolumeMl + volumeMl > capacityMl) {
+      setError(`That addition exceeds the ${capacityMl}ml vessel capacity.`);
       return;
     }
 
@@ -32,7 +38,7 @@ export function PourEntry({ blendId, bottles, onAddEvent, onConsumeBottle }: Pou
     if (kind === 'ADD') {
       abvBp = selectedBottle?.abvBp ?? parseAbvBp(abvInput);
       if (abvBp === null) {
-        setError('Invalid ABV');
+        setError('Enter a valid ABV, such as 46%.');
         return;
       }
       if (

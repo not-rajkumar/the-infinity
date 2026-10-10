@@ -3,7 +3,7 @@
  * Keys: barcode (EAN/UPC) or normalized name.
  * TTL-based eviction + max-size eviction.
  */
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { catalogCache } from '../db/schema';
 import { db } from '../db';
 
@@ -26,28 +26,27 @@ export class CatalogCache {
   get(barcode: string): CatalogEntry | null {
     const row = db.select().from(catalogCache).where(eq(catalogCache.barcode, barcode)).get() ?? null;
     if (!row) return null;
-    const data = JSON.parse(row.dataJson) as CatalogEntry & { cachedAt: string };
-    if (Date.now() - new Date(data.cachedAt).getTime() > TTL_MS) {
+    if (Date.now() - new Date(row.cachedAt).getTime() > TTL_MS) {
       db.delete(catalogCache).where(eq(catalogCache.barcode, barcode)).run();
       return null;
     }
-    return data;
+    return JSON.parse(row.dataJson) as CatalogEntry;
   }
 
   set(entry: CatalogEntry): void {
-    this.evictIfNeeded();
+    db.delete(catalogCache).where(eq(catalogCache.barcode, entry.barcode)).run();
     db.insert(catalogCache).values({
       barcode: entry.barcode,
       dataJson: JSON.stringify(entry),
       cachedAt: new Date().toISOString(),
     }).run();
+    this.evictIfNeeded();
   }
 
   private evictIfNeeded(): void {
-    const rows = db.select().from(catalogCache).all();
-    const count = rows.length;
-    if (count >= MAX_CACHED) {
-      const oldest = db.select().from(catalogCache).orderBy(catalogCache.cachedAt).limit(1).get();
+    const rows = db.select().from(catalogCache).orderBy(asc(catalogCache.cachedAt)).all();
+    while (rows.length > MAX_CACHED) {
+      const oldest = rows.shift();
       if (oldest) db.delete(catalogCache).where(eq(catalogCache.barcode, oldest.barcode)).run();
     }
   }

@@ -5,6 +5,7 @@ import { formatAbv, formatVolume } from '../../domain/units';
 
 export default function LogScreen() {
   const events = useEventStore((store) => store.events);
+  const foldResult = useEventStore((store) => store.foldResult);
   const bottles = useBottleStore((store) => store.bottles);
   return (
     <ScrollView className="flex-1 bg-stone-950" contentContainerClassName="p-5">
@@ -13,7 +14,13 @@ export default function LogScreen() {
       {events.length === 0 ? (
         <Text className="text-stone-500">Your pour history will appear here.</Text>
       ) : (
-        events.map((event) => (
+        [...events].sort((a, b) => {
+          if (a.occurredAt !== b.occurredAt) return a.occurredAt < b.occurredAt ? 1 : -1;
+          return a.createdAt < b.createdAt ? 1 : -1;
+        }).map((event) => {
+          const projection = foldResult.projections.find((item) => item.eventId === event.id);
+          const problem = foldResult.problems.find((item) => item.eventId === event.id);
+          return (
           <View key={event.id} className="bg-stone-900 p-4 rounded-2xl border border-stone-800 mb-3">
             <View className="flex-row justify-between">
               <Text className={event.kind === 'ADD' ? 'text-amber-400 font-bold' : 'text-stone-300 font-bold'}>
@@ -21,7 +28,10 @@ export default function LogScreen() {
               </Text>
               <Text className="text-stone-200 font-bold">{formatVolume(event.volumeMl)}</Text>
             </View>
-            {event.abvBp !== null && <Text className="text-stone-400 mt-2">{formatAbv(event.abvBp)} projection</Text>}
+            {projection?.abvBp !== null && projection?.abvBp !== undefined && (
+              <Text className="text-stone-400 mt-2">{formatAbv(projection.abvBp)} projection</Text>
+            )}
+            {problem && <Text className="text-amber-400 mt-2">{problem.detail}</Text>}
             {event.sourceBottleId && (
               <Text className="text-amber-300 mt-1">
                 Source: {bottles.find((bottle) => bottle.id === event.sourceBottleId)?.name ?? 'Deleted bottle'}
@@ -30,7 +40,8 @@ export default function LogScreen() {
             {event.note && <Text className="text-stone-300 mt-1">{event.note}</Text>}
             <Text className="text-stone-600 text-xs mt-3">{new Date(event.occurredAt).toLocaleString()}</Text>
           </View>
-        ))
+          );
+        })
       )}
     </ScrollView>
   );

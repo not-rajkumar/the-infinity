@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "The Infinity",
+    "slug": "the-infinity",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow The Infinity to scan bottle barcodes.",
+          "recordAudioAndroid": false
+        }
+      ]
+    ]
+  }
+}
