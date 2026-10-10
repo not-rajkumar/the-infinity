@@ -38,7 +38,7 @@ jobs:
 
       - name: Patch Expo Kotlin compatibility
         run: |
-          find node_modules/expo-modules-autolinking/android/expo-gradle-plugin -name build.gradle.kts -print0 |
+          find node_modules/expo-modules-core node_modules/expo-modules-autolinking/android/expo-gradle-plugin -name build.gradle.kts -print0 |
             xargs -0 sed -i '/jvmTarget.set(JvmTarget.JVM_11)/a\    freeCompilerArgs.add("-Xskip-metadata-version-check")'
 
       - name: Update Gradle wrapper
