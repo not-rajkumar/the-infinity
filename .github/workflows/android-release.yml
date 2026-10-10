@@ -36,6 +36,10 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install --non-interactive
 
+      - name: Update Gradle wrapper
+        working-directory: android
+        run: sed -i 's/gradle-9\.3\.1-bin\.zip/gradle-9.4.1-bin.zip/' gradle/wrapper/gradle-wrapper.properties
+
       - name: Assemble release APK
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon --stacktrace
